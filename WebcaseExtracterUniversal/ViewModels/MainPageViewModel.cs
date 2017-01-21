@@ -85,7 +85,14 @@ namespace WebcaseExtracterUniversal.ViewModels
                 // Need to adjust video length and screenshot
             }
         }
+
         private StorageFile _csvFile = null;
+
+        public StorageFile CsvFile
+        {
+            get { return _csvFile;}
+            set { Set(ref _videoFile, value); }
+        }
 
 
         private Dictionary<string, string> _parsedValues;
@@ -106,7 +113,7 @@ namespace WebcaseExtracterUniversal.ViewModels
             openPicker.FileTypeFilter.Add(".mp4");
             VideoFile = await openPicker.PickSingleFileAsync();
 
-            this.RaisePropertyChanged();
+            SelectOutputFileCommand.RaiseCanExecuteChanged();
         }
 
         private AwaitableDelegateCommand _selectOutputFileCommand;
@@ -122,6 +129,7 @@ namespace WebcaseExtracterUniversal.ViewModels
             fileSavePicker.FileTypeChoices.Add("CSV File", new List<string> { ".csv" });
 
             _csvFile = await fileSavePicker.PickSaveFileAsync();
+            ProcessVideoCommand.RaiseCanExecuteChanged();
         }
 
         public bool CanSelectOutputFile(AwaitableDelegateCommandParameter arg)

@@ -22,9 +22,16 @@
             <ColumnDefinition></ColumnDefinition>
         </Grid.ColumnDefinitions>
         <StackPanel Grid.Row="0" Grid.Column="0">
-            <Button Command="{Binding SelectVideoCommand}">Select Video</Button>
-            <Button Command="{Binding SelectOutputFileCommand}">Select CSV</Button>
-            <Button Command="{Binding ProcessVideoCommand}" Content="Process Video" />
+            <StackPanel Orientation="Horizontal">
+                <Button Width="100" Command="{Binding SelectVideoCommand}">Select Video</Button>
+                <TextBlock Text="{Binding VideoFile.Name}"></TextBlock>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <Button Width="100" Command="{Binding SelectOutputFileCommand}">Select CSV</Button>
+                <TextBlock Text="{Binding CsvFile.Name}"></TextBlock>
+            </StackPanel>
+            
+            <Button Width="100" Command="{Binding ProcessVideoCommand}" Content="Process Video" />
             <!--<Button VerticalAlignment="Top" HorizontalAlignment="Left" Content="Create secondary view" 
                     Command="{Binding NavigateCommand}" ></Button>-->
             <Grid>
