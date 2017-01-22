@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Windows.Foundation;
@@ -13,11 +12,9 @@ using Windows.Storage;
 using Windows.Storage.Pickers;
 using Windows.Storage.Streams;
 using Windows.UI.Xaml;
-using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media.Imaging;
 using Template10.Mvvm;
 using WebcaseExtracterUniversal.Models;
-using WebcaseExtracterUniversal.Views;
 
 namespace WebcaseExtracterUniversal.ViewModels
 {
@@ -26,13 +23,18 @@ namespace WebcaseExtracterUniversal.ViewModels
         public MainPageViewModel()
         {
             Test = "Test Text";
+            RectsItems = new ObservableCollection<Rect>();
 
             _ocrAreas.Add(new OcrArea { Name = "Velocity", Area = new Rect(1550, 210, 120, 35) });
             _ocrAreas.Add(new OcrArea { Name = "Altitude", Area = new Rect(1750, 210, 90, 35) });
 
+            OutlineOcrSection(_ocrAreas[0].Area, 0.4, 0.4);
+            OutlineOcrSection(_ocrAreas[1].Area, 0.4, 0.4);
+
             ProgressBarVisibility = Visibility.Collapsed;
             VideoLength = 1;
             CurrentVideoPosition = 0;
+            
         }
 
         private string _test;
@@ -74,7 +76,6 @@ namespace WebcaseExtracterUniversal.ViewModels
         }
 
         private StorageFile _videoFile = null;
-
         public StorageFile VideoFile
         {
             get { return _videoFile; }
@@ -129,7 +130,8 @@ namespace WebcaseExtracterUniversal.ViewModels
             fileSavePicker.FileTypeChoices.Add("CSV File", new List<string> { ".csv" });
 
             _csvFile = await fileSavePicker.PickSaveFileAsync();
-            ProcessVideoCommand.RaiseCanExecuteChanged();
+            //ProcessVideoCommand.RaiseCanExecuteChanged();
+            RaisePropertyChanged(nameof(CanProcessVideo));
         }
 
         public bool CanSelectOutputFile(AwaitableDelegateCommandParameter arg)
@@ -137,14 +139,10 @@ namespace WebcaseExtracterUniversal.ViewModels
             return VideoFile != null;
         }
 
-        private AwaitableDelegateCommand _processVideoCommand;
-        public AwaitableDelegateCommand ProcessVideoCommand => _processVideoCommand ?? (_processVideoCommand = new AwaitableDelegateCommand(ExecuteProcessVideo, CanProcessVideo));
+        public bool CanProcessVideo =>  VideoFile != null && _csvFile != null;
+        
 
-        public bool CanProcessVideo(AwaitableDelegateCommandParameter arg)
-        {
-            return VideoFile != null && _csvFile != null;
-        }
-        public async Task ExecuteProcessVideo(AwaitableDelegateCommandParameter arg)
+        public async Task ExecuteProcessVideo()
         {
             ProgressBarVisibility = Visibility.Visible;
 
@@ -152,23 +150,7 @@ namespace WebcaseExtracterUniversal.ViewModels
             var startTime = new TimeSpan(0, 19, 30);
             var endTime = new TimeSpan(0, 28, 00);
 
-            //00070 at 1566,215,98,25
-            //00.8 at 1770,213,69,25
-            //var speedRect = new Rect(1550, 210, 120, 35);
-            //var speedRect = new Rect( 1566, 215, 97, 25 );
-            //var altitudeRect = new Rect(1750, 210, 90, 35);
-
-
-            //FileOpenPicker openPicker = new FileOpenPicker();
-            //openPicker.ViewMode = PickerViewMode.Thumbnail;
-            //openPicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
-            //openPicker.FileTypeFilter.Add(".mp4");
-
-            var flight = new List<FlightPoint>();
-
-            //StorageFile file = await openPicker.PickSingleFileAsync();
-
-           
+            var flight = new List<Dictionary<string, object>>();
 
             var mediaClip = await MediaClip.CreateFromFileAsync(VideoFile);
             var mediaComposition = new MediaComposition();
@@ -191,8 +173,6 @@ namespace WebcaseExtracterUniversal.ViewModels
             //var widthFactor = (width / videoWidth);
             //var heightFactor = height / videoHeight;
 
-            //OutlineOcrSection(_ocrAreas[0].Area, widthFactor, heightFactor);
-            //OutlineOcrSection(_ocrAreas[1].Area, widthFactor, heightFactor);
 
             for (var i = 0; i < ocrSeconds; i++)
             {
@@ -205,10 +185,8 @@ namespace WebcaseExtracterUniversal.ViewModels
 
                 var result = await ocrEngine.RecognizeAsync(bitmap);
 
-                bool velPassed = false;
-                bool speedPassed = false;
-
-                var values = OcrAreas.ToDictionary(x => x.Name, x => 0.0m);
+                var values = OcrAreas.ToDictionary(x => x.Name, x => new object());
+                values["Time"] = currentTime;
                 var succeeded = OcrAreas.ToDictionary(x => x.Name, x => false);
 
                 foreach (var line in result.Lines)
@@ -235,7 +213,7 @@ namespace WebcaseExtracterUniversal.ViewModels
                     }
                 }
 
-                if (!speedPassed || !velPassed)
+                if (succeeded.Any(x => !x.Value))
                 {
                     Debug.WriteLine(result.Text);
                 }
@@ -245,9 +223,9 @@ namespace WebcaseExtracterUniversal.ViewModels
 
                 ParsedValues = values.ToDictionary(x => x.Key, x => x.Value.ToString());
 
-                var point = new FlightPoint { Velocity = values["Velocity"], Altitude = values["Altitude"], Time = time };
-                Debug.WriteLine($"{point.Time}, {point.Altitude}, {point.Velocity}");
-                flight.Add(point);
+                //var point = new FlightPoint { Velocity = (decimal)values["Velocity"], Altitude = (decimal)values["Altitude"], Time = time };
+                Debug.WriteLine($"{values["Time"]}, {values["Altitude"]}, {values["Velocity"]}");
+                flight.Add(values);
 
                 CurrentVideoPosition = i;
             }
@@ -257,24 +235,34 @@ namespace WebcaseExtracterUniversal.ViewModels
 
             using (IRandomAccessStream stream = await _csvFile.OpenAsync(FileAccessMode.ReadWrite))
             {
-                using (var dataWriter = new Windows.Storage.Streams.DataWriter(stream))
+                using (var dataWriter = new DataWriter(stream))
                 {
-                    dataWriter.WriteString($"time,altitude,velocity,acceleration{Environment.NewLine}");
-                    decimal prevVelocity = 0;
-                    var prevTime = TimeSpan.Zero;
+                    //dataWriter.WriteString($"time,altitude,velocity,acceleration{Environment.NewLine}");
+                    var commaSeperatedHeadings = string.Join(",", flight.First().Where(x => x.Key != "Time").Select(x => x.Key));
+                    dataWriter.WriteString($"Time,{commaSeperatedHeadings}");
+                    
+                    //decimal prevVelocity = 0;
+                    //var prevTime = TimeSpan.Zero;
                     foreach (var entry in flight)
                     {
-                        var timeDelta = (decimal)(entry.Time - prevTime).TotalSeconds;
-                        var ac = 0m;
-                        if (timeDelta > 0)
-                        {
-                            ac = (entry.Velocity - prevVelocity) / timeDelta;
-                        }
+                        var time = (TimeSpan) entry["Time"];
+                        //var timeDelta = (decimal)(time - prevTime).TotalSeconds;
+                        //var ac = 0m;
+                        //if (timeDelta > 0)
+                        //{
+                        //    ac = (entry.Velocity - prevVelocity) / timeDelta;
+                        //}
 
-                        prevVelocity = entry.Velocity;
-                        prevTime = entry.Time;
+                        //prevVelocity = entry.Velocity;
+                        //prevTime = time;
 
-                        dataWriter.WriteString($"{entry.Time}, {entry.Altitude}, {entry.Velocity}, {ac}{Environment.NewLine}");
+                        //dataWriter.WriteString($"{time}, {entry.Altitude}, {entry.Velocity}, {ac}{Environment.NewLine}");
+                        //var sb = new StringBuilder();
+
+                        var commaSeperatedValues = string.Join(",", entry.Where(x => x.Key != "Time").Select(x => x.Value.ToString()));
+
+                        dataWriter.WriteString($"{time},");
+                        dataWriter.WriteString(commaSeperatedValues);
                     }
                     await dataWriter.StoreAsync();
                     await stream.FlushAsync();
@@ -284,8 +272,22 @@ namespace WebcaseExtracterUniversal.ViewModels
             ProgressBarVisibility = Visibility.Collapsed;
         }
 
-        private SoftwareBitmapSource _previewImageSource;
+        public ObservableCollection<Rect> RectsItems { get; }
 
+        private void OutlineOcrSection(Rect speedRect, double widthFactor, double heightFactor)
+        {
+            RectsItems.Add(new Rect(speedRect.X * widthFactor, speedRect.Y * heightFactor, speedRect.Width * widthFactor, speedRect.Height * heightFactor));
+        }
+
+
+        private int areaCount;
+        public void AddParameter(object sender, RoutedEventArgs e)
+        {
+            OcrAreas.Add(new OcrArea { Name = $"Property {areaCount}" });
+            areaCount++;
+        }
+
+        private SoftwareBitmapSource _previewImageSource;
         public SoftwareBitmapSource PreviewImageSource
         {
             get { return _previewImageSource;}
@@ -300,12 +302,10 @@ namespace WebcaseExtracterUniversal.ViewModels
                 bitmap = SoftwareBitmap.Convert(bitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
             }
 
-
             var source = new SoftwareBitmapSource();
             await source.SetBitmapAsync(bitmap);
 
             // Set the source of the Image control
-            //PreviewImage.Source = source;
             PreviewImageSource = source;
         }
 
@@ -314,9 +314,7 @@ namespace WebcaseExtracterUniversal.ViewModels
         public DelegateCommand NavigateCommand => _navigateCommand ?? (_navigateCommand = new DelegateCommand(ExecuteNavigate));
         private void ExecuteNavigate()
         {
-            //_dataService.Save();
             NavigationService.Navigate(typeof(Views.SecondView));
-
         }
     }
 }

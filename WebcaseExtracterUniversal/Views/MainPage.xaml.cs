@@ -15,6 +15,7 @@ using Windows.Storage.Streams;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Imaging;
 using Windows.UI.Xaml.Shapes;
+using WebcaseExtracterUniversal.ViewModels;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -30,8 +31,10 @@ namespace WebcaseExtracterUniversal.Views
     /// <summary>
     /// An empty page that can be used on its own or navigated to within a Frame.
     /// </summary>
-    public sealed partial class MainPage : Page
+    public sealed partial class MainPage : BasePage
     {
+        public MainPageViewModel ViewModel { get; set; }
+
         public MainPage()
         {
             this.InitializeComponent();
@@ -81,18 +84,18 @@ namespace WebcaseExtracterUniversal.Views
             var altitude = 0m;
             this.ProgressBar.Maximum = ocrSeconds;
 
-            var width = PreviewImage.Width;
-            var height = PreviewImage.Height;
+            //var width = PreviewImage.Width;
+            //var height = PreviewImage.Height;
 
-            var encodingProperties = mediaClip.GetVideoEncodingProperties();
-            var videoWidth = encodingProperties.Width;
-            var videoHeight = encodingProperties.Height;
+            //var encodingProperties = mediaClip.GetVideoEncodingProperties();
+            //var videoWidth = encodingProperties.Width;
+            //var videoHeight = encodingProperties.Height;
 
-            var widthFactor = (width / videoWidth);
-            var heightFactor = height / videoHeight;
+            //var widthFactor = (width / videoWidth);
+            //var heightFactor = height / videoHeight;
 
-            OutlineOcrSection(speedRect, widthFactor, heightFactor);
-            OutlineOcrSection(altitudeRect, widthFactor, heightFactor);
+            //OutlineOcrSection(speedRect, widthFactor, heightFactor);
+            //OutlineOcrSection(altitudeRect, widthFactor, heightFactor);
 
 
             for (var i = 0; i < ocrSeconds; i++)
@@ -155,7 +158,7 @@ namespace WebcaseExtracterUniversal.Views
                 flight.Add(point);
 
                 ProgressBar.Value = i;
-                PreviewImage.RenderTransform = null;
+               
             }
 
             // Get information about the preview
@@ -199,7 +202,7 @@ namespace WebcaseExtracterUniversal.Views
             rectangle1.Stroke = new SolidColorBrush(Windows.UI.Colors.Red);
             rectangle1.StrokeThickness = 3;
 
-            Canvas1.Children.Add(rectangle1);
+            //Canvas1.Children.Add(rectangle1);
             Canvas.SetLeft(rectangle1, speedRect.Left * widthFactor);
             Canvas.SetTop(rectangle1, speedRect.Top * heightFactor);
             Canvas.SetZIndex(rectangle1, 1);
@@ -218,7 +221,7 @@ namespace WebcaseExtracterUniversal.Views
             await source.SetBitmapAsync(bitmap);
 
             // Set the source of the Image control
-            PreviewImage.Source = source;
+            //PreviewImage.Source = source;
         }
 
         internal class FileExtensions
